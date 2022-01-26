@@ -14,6 +14,8 @@ This bot will look at the the lowest point of a candle. **TEKST**
 
 Place orders at a fixed value or percentage when the price changes. Using this feature you can buy at the lowest possible price when buying down and sell at the highest possible price when selling up.
 
+You can make the bot percentage or fixed price based.
+
 ## Riskmanagement
 
 We have two values: **BTSL** (Buy Trailing Stop Loss) and **STSL** (Sell Trailing Stop Loss).
