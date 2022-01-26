@@ -32,7 +32,9 @@ The lower you set the value of STSL, the earlier it will sell.
 ## Backtesting
 
 I have tested this bot with different coins, intervals, start/end dates, BTSL, STSL. 
-The best values found for BTSL is **?** and for STSL is **?**.
+
+The best values found for **variable** BTSL is **4** and for STSL is **2**.
+The best values found for **fixed** BTSL is **100** and for STSL is **100**.
 
 ## Donations
 

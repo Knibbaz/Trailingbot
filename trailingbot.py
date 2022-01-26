@@ -12,7 +12,7 @@ market = "ETH" ## Market to trade on
 # Get the chartdata
 chart = requests.get("https://api.binance.com/api/v3/klines?symbol=" + market + "EUR&interval=" + interval + "&limit=1000" + "&startTime=" + str(start * 1000) + "&endTime=" + str(end * 1000)).json()
 
-def trading(buySide, currentOrder, botMoney, BTSL, STSL, priceFixed):
+def trading(chart, buySide, currentOrder, botMoney, BTSL, STSL, priceFixed):
     previousLow = None
     trades = []
     
@@ -41,40 +41,39 @@ def trading(buySide, currentOrder, botMoney, BTSL, STSL, priceFixed):
                 else: currentOrder = possibleSellOrder
                 createStopLossOrder(buySide, currentOrder)
         
-         ## Check if we can filled an order
+        ## Check if we can filled an order
         if not currentOrder == None:
-            if (low > currentOrder and buySide) or (low < currentOrder and not buySide): ##
-                string = ""
+            if (low > currentOrder and buySide) or (low < currentOrder and not buySide):
+                side = ""
                 profit = 0
                 
                 if buySide: 
-                    string = "BOUGHT"
+                    side = "BOUGHT"
                     if len(trades) > 0: profit = trades[-1]['price'] / currentOrder * 100
                     botMoney = botMoney / currentOrder 
                     
                 else:
-                    string = "SOLD"
+                    side = "SOLD"
                     if len(trades) > 0: profit =  currentOrder / trades[-1]['price'] * 100
                     botMoney = botMoney * currentOrder 
                 
-                trades.append({"side": string, "price": currentOrder, "timestamp": timestamp, "botMoney": botMoney, "profitable": bool(profit > 100)})
+                trades.append({"side": side, "price": currentOrder, "timestamp": timestamp, "botMoney": botMoney, "profitable": bool(profit > 100)})
                 
-                print(string, round(currentOrder, 2), round(botMoney, 2))
+                # print(side, round(currentOrder, 2), round(botMoney, 2))
                 
                 currentOrder = None
                 buySide = not buySide
                 
         previousLow=low
-    print()
+    # print()
     return(trades, botMoney)
 
 ## Create (test) orders
 def createStopLossOrder(buySide, order):
     order = round(order, 2)
-    if buySide: print("BSL at", order)
-    else: print("SSL at", order)
+    # if buySide: print("BSL at", order)
+    # else: print("SSL at", order)
     
-
 ## Bot settings
 BTSL = 100 ## Percentage or fixed price above low to buy.
 STSL = 200 ## Percentage or fixed price below low to sell.
@@ -84,9 +83,9 @@ currentOrder = None ## If have running orders, set its price here. Otherwise set
 botMoney = 1000 ## The amount of money the bot can play with. If you own crypto already, you can put the amount here and must set buySide to False.
 
 ## Run the bot
-trades, botMoney = trading(buySide, currentOrder, botMoney, BTSL, STSL, priceFixed)
-print(trades)
+# trades, botMoney = trading(chart, buySide, currentOrder, botMoney, BTSL, STSL, priceFixed)
+# print(trades)
 
 ## If recently bought, multiply the amount bought by the latest closing rate
-if trades[-1]['side'] == "BOUGHT": botMoney = botMoney * float(chart[-1][4])
-print("\nResult:", botMoney)
+# if trades[-1]['side'] == "BOUGHT": botMoney = botMoney * float(chart[-1][4])
+# print("\nResult:", botMoney)
