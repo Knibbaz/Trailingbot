@@ -2,28 +2,26 @@
 import requests
 from datetime import datetime
 
-day = 86400
-interval = '1d'
-start = int(datetime.now().timestamp()) - (day * 365)
-end = int(datetime.now().timestamp())
-market = "BTC"
+day = 86400 ## Timestamp for one day
+
+interval = '1d' ## Timestamp to trade on
+start = int(datetime.now().timestamp()) - (day * 30) ##
+end = int(datetime.now().timestamp()) ##
+market = "ETH" ## Market to trade on
+
+BTSL = 10 ## Percentage above low to buy
+STSL = 7.5 ## Percentage below low to sell
+buySide = True ##
+currentOrder = None ##
+botMoney = 1000 ##
 
 # Get the chartdata
 chart = requests.get("https://api.binance.com/api/v3/klines?symbol=" + market + "EUR&interval=" + interval + "&limit=1000" + "&startTime=" + str(start * 1000) + "&endTime=" + str(end * 1000)).json()
 
-## Percentage above low to buy
-## Percentage below low to sell
-BTSL = 20
-STSL = 10
-
-def trading(BTSL, STSL):
-    buySide = True
+def trading(buySide, currentOrder, botMoney, BTSL, STSL):
     previousLow = None
-    currentOrder = None
-    
     trades = []
-    botMoney = 1000
-
+    
     for candle in chart:
         timestamp = float(candle[0] / 1000)
         low = float(candle[3])
@@ -49,16 +47,19 @@ def trading(BTSL, STSL):
         if not currentOrder == None:
             if (low > currentOrder and buySide) or (low < currentOrder and not buySide): ##
                 string = ""
+                profit = 0
                 
                 if buySide: 
-                    botMoney = botMoney / currentOrder 
                     string = "BOUGHT"
+                    if len(trades) > 0: profit = trades[-1]['price'] / currentOrder * 100
+                    botMoney = botMoney / currentOrder 
                     
                 else:
-                    botMoney = botMoney * currentOrder 
                     string = "SOLD"
+                    if len(trades) > 0: profit =  currentOrder / trades[-1]['price'] * 100
+                    botMoney = botMoney * currentOrder 
                 
-                trades.append({"side": string, "price": currentOrder, "timestamp": timestamp, "botMoney": botMoney})
+                trades.append({"side": string, "price": currentOrder, "timestamp": timestamp, "botMoney": botMoney, "profitable": bool(profit > 100)})
                 
                 print(string, round(currentOrder, 2), round(botMoney, 2))
                 
@@ -66,7 +67,8 @@ def trading(BTSL, STSL):
                 buySide = not buySide
                 
         previousLow=low
-    return(trades, round(botMoney, 2))
+    print()
+    return(trades, botMoney)
 
 ## Create (test) orders
 def createStopLossOrder(buySide, order):
@@ -74,5 +76,10 @@ def createStopLossOrder(buySide, order):
     if buySide: print("BSL at", order)
     else: print("SSL at", order)
     
-## Run the bot and print the results
-print(trading(BTSL, STSL))
+## Run the bot
+trades, botMoney = trading(buySide, currentOrder, botMoney, BTSL, STSL)
+print(trades)
+
+## If recently bought, multiply the amount bought by the latest closing rate
+if trades[-1]['side'] == "BOUGHT": botMoney = botMoney * float(chart[-1][4])
+print("\nResult:", botMoney)
