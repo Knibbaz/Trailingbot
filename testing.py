@@ -1,5 +1,7 @@
-from trailingbot import trading
+import os
+from numpy import char
 import requests
+from trailingbot import trading
 from datetime import datetime
 
 ## Bot settings
@@ -7,30 +9,34 @@ buySide = True
 currentOrder = None
 botMoney = 1000
 
-markets = ["BTCUSDT", "BTCEUR", "ETHUSDT", "ETHEUR"]
+hour = 3600 ## Seconds in an hour
+day = 86400 ## Seconds in a days
 
-day = 86400 ## Timestamp for one day
-start = int(datetime.now().timestamp()) - (day * 30) ## amount days ago for today
+start = int(datetime.now().timestamp()) - (day * 365) ## amount days ago for today
 end = int(datetime.now().timestamp()) ## Today
-interval = '1d' ## Timestamp to trade on
-market = "ETH" ## Market to trade on
+interval = '15m' ## Timestamp to trade on
+markets = ["ETHUSDT"]
 
-tradesTesting = []
-settingsTesting = []
-resultMoneyTesting = []
+maxStopLimit = 5
+stepsStopLimit = 1
+priceFixed = False
+
+# maxStopLimit = float(os.environ['MSL'])
+# stepsStopLimit = float(os.environ['SSL'])
+# priceFixed = bool(os.environ["PF"])
+# start = int(os.environ['START'])
+# end = int(os.environ['END'])
+# interval = os.environ['INT']
+
+############################################
+## Find most profitable per interval, market
+############################################
+
+tradesMade = []
+settingsUsed = []
+profitsEarned = []
 
 print("TESTING")
-
-def tradingTesting():
-    ## Testing price variable
-    maxStopLimit = 20
-    stepsStopLimit = 1
-    randomSettings(maxStopLimit, stepsStopLimit, False)
-    
-    ## Testing price fixed
-    maxStopLimit = 1000
-    stepsStopLimit = 100
-    randomSettings(maxStopLimit, stepsStopLimit, True)
 
 def randomSettings(maxStopLimit, stepsStopLimit, priceFixed):
     BTSL = 0
@@ -52,38 +58,87 @@ def randomDate(market, BTSL, STSL, priceFixed):
     chart = requests.get("https://api.binance.com/api/v3/klines?symbol=" + market + "&interval=" + interval + "&limit=1000" + "&startTime=" + str(start * 1000) + "&endTime=" + str(end * 1000)).json()
 
     # Run the date forwards
+    testChart = chart
     testingDate = start
     while testingDate < end:
-        trades, resultMoney = trading(chart, buySide, currentOrder, botMoney, BTSL, STSL, priceFixed)
-        if resultMoney > botMoney: 
-            tradesTesting.append(trades)
-            settingsTesting.append({"market": market, "testingDate": testingDate, "end": end, "BTSL": BTSL, "STSL": STSL, "priceFixed": priceFixed})
-            resultMoneyTesting.append(resultMoney)
+        testSettingsAndNewChart(testChart, BTSL, STSL, market, priceFixed)
         testingDate += day
-        if len(chart) > 0: del chart[0]
+        if len(testChart) > 0: del testChart[0]
         
-    # Get the chartdata
-    chart = requests.get("https://api.binance.com/api/v3/klines?symbol=" + market + "&interval=" + interval + "&limit=1000" + "&startTime=" + str(start * 1000) + "&endTime=" + str(end * 1000)).json()
-
     # Run the date backwards
+    # Reset chart data
+    testChart = chart
     testingDate = end
     while start < testingDate:
-        if len(chart) > 0: del chart[-1]
+        if len(testChart) > 0: del testChart[-1]
         testingDate -= day
-        trades, resultMoney = trading(chart, buySide, currentOrder, botMoney, BTSL, STSL, priceFixed)
-        if resultMoney > botMoney: 
-            tradesTesting.append(trades)
-            settingsTesting.append({"market": market, "testingDate": testingDate, "end": end, "BTSL": BTSL, "STSL": STSL, "priceFixed": priceFixed})
-            resultMoneyTesting.append(resultMoney)
+        testSettingsAndNewChart(testChart, BTSL, STSL, market, priceFixed)
+        
+def testSettingsAndNewChart(chart, BTSL, STSL, market, priceFixed):
+    trades, resultMoney = trading(chart, buySide, currentOrder, botMoney, BTSL, STSL, priceFixed)
+    if resultMoney > botMoney: 
+        tradesMade.append(trades)
+        settingsUsed.append({"market": market, "BTSL": BTSL, "STSL": STSL, "priceFixed": priceFixed, "resultMoney": resultMoney})
+        profitsEarned.append(resultMoney)
 
-tradingTesting()
-print()
+def getChartData(market, interval, start, end):
+    limit = 1000
+    currentEnd = start
+    
+    if "m" in interval:
+        callsPerDay = 60 / int(interval[:-1]) * 24
+        callsOverTimespan = (end - start) / day
+        totalCalls = callsPerDay * callsOverTimespan
+        callsNeeded = totalCalls / limit
+        
+        calls = 0
+        chart = []
+        
+        while calls <= callsNeeded:
+            calls += 1
+            
+            # if calls > callsNeeded: currentEnd = end
+            nextTimestamp = int(limit / callsPerDay * day)
+            
+            start = currentEnd
+            currentEnd += nextTimestamp
+            
+            print(start, currentEnd)
+            call = requests.get("https://api.binance.com/api/v3/klines?symbol=" + market + "&interval=" + interval + "&limit=10" + "&startTime=" + str(start * 1000) + "&endTime=" + str(currentEnd * 1000)).json()
+            
+            print(call[0][0] > start and call[0][0] < currentEnd)
+            
+            for data in call:
+                chart.append(data)
+        #     for candle in data:
+        #         print(candle)
+        #         chart.append(candle)
+        
+    print(callsNeeded)
+    print(len(chart))
 
-max_value = max(resultMoneyTesting)
-max_index = resultMoneyTesting.index(max_value)
-print(resultMoneyTesting[max_index])
-print(tradesTesting[max_index])
-print(settingsTesting[max_index])
+# getChartData(markets[0], interval, start, end)
+## Testing price variable
+# randomSettings(maxStopLimit, stepsStopLimit, priceFixed)
 
-print()
+# Get the best amount of the array
+# Get the settings for all the trades with the same outcome
+# Remove these indexes from the array
+# Do this for the x best amount
+
+# max_value = max(profitsEarned)
+# print(max_value)
+# indexes = [i for i,val in enumerate(profitsEarned) if val==max_value]
+# for i in indexes: 
+#     print(settingsUsed[i])
+    
+# trades = 0
+# profitable = 0
+# for trade in tradesMade[indexes[0]]:
+#     trades += 1
+#     if trade['profitable']: profitable += 1
+    
+# # print(trades, profitable)
+# print(str(float(profitable) / float(trades) * 100) + "% of the trades was profitabe")
+
 print("END")
