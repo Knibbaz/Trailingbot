@@ -1,13 +1,16 @@
 #!/usr/bin/python3
 import requests
 from datetime import datetime
+import bitvavo
 
 day = 86400 ## Timestamp for one day
 
-interval = '1d' ## Timestamp to trade on
+interval = '15m' ## Timestamp to trade on
 start = int(datetime.now().timestamp()) - (day * 30) ##
 end = int(datetime.now().timestamp()) ##
 market = "ETH" ## Market to trade on
+
+tradingExchange = "Bitvavo"
 
 # Get the chartdata
 chart = requests.get("https://api.binance.com/api/v3/klines?symbol=" + market + "EUR&interval=" + interval + "&limit=1000" + "&startTime=" + str(start * 1000) + "&endTime=" + str(end * 1000)).json()
@@ -33,13 +36,13 @@ def trading(buySide, currentOrder, botMoney, BTSL, STSL, priceFixed):
             ## For creating the first order or after bought/sold
             if currentOrder == None and (low < previousLow and buySide or low > previousLow and not buySide):
                 currentOrder = possibleBuyOrder
-                createStopLossOrder(buySide, currentOrder)
+                createStopLossOrder(buySide, currentOrder, timestamp)
                     
             ## Check if there is a buy or sell option
             if (low < previousLow and buySide and possibleBuyOrder < currentOrder) or (low > previousLow and not buySide and possibleSellOrder > currentOrder): ## BUY
                 if buySide: currentOrder = possibleBuyOrder
                 else: currentOrder = possibleSellOrder
-                createStopLossOrder(buySide, currentOrder)
+                createStopLossOrder(buySide, currentOrder, timestamp)
         
          ## Check if we can filled an order
         if not currentOrder == None:
@@ -69,16 +72,27 @@ def trading(buySide, currentOrder, botMoney, BTSL, STSL, priceFixed):
     return(trades, botMoney)
 
 ## Create (test) orders
-def createStopLossOrder(buySide, order):
+def createStopLossOrder(buySide, order, timestamp):
     order = round(order, 2)
     if buySide: print("BSL at", order)
     else: print("SSL at", order)
     
+    exchange = getExchange()
+    
+    ## FIX BASED ON TIMESTAMP
+    if timestamp >= datetime.now().timestamp() - day:
+        print("Place real order")
+        result = exchange.placeStopLossOrder("ETH", "sell", 0.02, 2700)
+        print(result)
+        
+def getExchange():
+    if tradingExchange == "Bitvavo": return bitvavo
+    
 
 ## Bot settings
-BTSL = 100 ## Percentage or fixed price above low to buy.
-STSL = 200 ## Percentage or fixed price below low to sell.
-priceFixed = True ## Set if you want to use percentage or fixed price for placing orders.
+BTSL = 10 ## Percentage or fixed price above low to buy.
+STSL = 7.5 ## Percentage or fixed price below low to sell.
+priceFixed = False ## Set if you want to use percentage or fixed price for placing orders.
 buySide = True ## Do you want to start with buying (True) or with selling (False).
 currentOrder = None ## If have running orders, set its price here. Otherwise set it to None.
 botMoney = 1000 ## The amount of money the bot can play with. If you own crypto already, you can put the amount here and must set buySide to False.
