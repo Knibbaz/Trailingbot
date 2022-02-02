@@ -23,5 +23,5 @@ def getChartCandles(coin, interval): return bitvavo.candles(coin + '-EUR', inter
 def getOrder(coin, orderId): return bitvavo.getOrder(coin + '-EUR', orderId)
 def getOpenOrders(): return bitvavo.ordersOpen({})
 
-def placeStopLossOrder(coin, amount, targetPrice):
-    return bitvavo.placeOrder(coin + '-EUR', 'buy', 'stopLossLimit', { 'amount': amount, 'price': targetPrice, 'triggerAmount': targetPrice, 'triggerType': 'price', 'triggerReference': 'lastTrade'})
+def placeStopLossOrder(coin, side, amount, targetPrice):
+    return bitvavo.placeOrder(coin + '-EUR', side, 'stopLossLimit', { 'amount': amount, 'price': targetPrice, 'triggerAmount': targetPrice, 'triggerType': 'price', 'triggerReference': 'lastTrade'})
