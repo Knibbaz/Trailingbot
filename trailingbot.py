@@ -79,7 +79,7 @@ def createStopLossOrder(buySide, order, timestamp):
     
     exchange = getExchange()
     
-    ## FIX BASED ON TIMESTAMP
+    ## FIX BASED ON INTERVAL
     if timestamp >= datetime.now().timestamp() - day:
         print("Place real order")
         result = exchange.placeStopLossOrder("ETH", "sell", 0.02, 2700)
@@ -87,7 +87,14 @@ def createStopLossOrder(buySide, order, timestamp):
         
 def getExchange():
     if tradingExchange == "Bitvavo": return bitvavo
-    
+
+def isItBetweenTheInterval(currentTimestamp):
+    if interval == "15m": return currentTimestamp >= datetime.now().timestamp() - (day / 24 / 60 * 15)
+    if interval == "30m": return currentTimestamp >= datetime.now().timestamp() - (day / 24 / 60 * 30)
+    if interval == "1h": return currentTimestamp >= datetime.now().timestamp() - (day / 24)
+    if interval == "4h": return currentTimestamp >= datetime.now().timestamp() - (day / 24 * 4)
+    if interval == "8h": return currentTimestamp >= datetime.now().timestamp() - (day / 24 * 8)
+    if interval == "1d": return currentTimestamp >= datetime.now().timestamp() - day
 
 ## Bot settings
 BTSL = 10 ## Percentage or fixed price above low to buy.
@@ -98,9 +105,11 @@ currentOrder = None ## If have running orders, set its price here. Otherwise set
 botMoney = 1000 ## The amount of money the bot can play with. If you own crypto already, you can put the amount here and must set buySide to False.
 
 ## Run the bot
-trades, botMoney = trading(buySide, currentOrder, botMoney, BTSL, STSL, priceFixed)
-print(trades)
+# trades, botMoney = trading(buySide, currentOrder, botMoney, BTSL, STSL, priceFixed)
+# print(trades)
 
-## If recently bought, multiply the amount bought by the latest closing rate
-if trades[-1]['side'] == "BOUGHT": botMoney = botMoney * float(chart[-1][4])
-print("\nResult:", botMoney)
+# ## If recently bought, multiply the amount bought by the latest closing rate
+# if trades[-1]['side'] == "BOUGHT": botMoney = botMoney * float(chart[-1][4])
+# print("\nResult:", botMoney)
+
+intervalThingy(datetime.now().timestamp() - (day / 5))
