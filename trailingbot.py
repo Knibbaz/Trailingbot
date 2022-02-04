@@ -9,7 +9,7 @@ load_dotenv(find_dotenv())
 
 day = 86400 ## Timestamp for one day
 start = int(datetime.now().timestamp()) - (day * 10) ## First timestamp
-end = int(datetime.now().timestamp()) ## Latest timestamp
+end = int(datetime.now().timestamp() - (day / 24 / 60 * 30)) ## Latest timestamp
 
 ## Bot settings
 with open('settings.json', 'r') as file: data = json.load(file)
@@ -100,6 +100,25 @@ def checkLatestTimestamp(currentTimestamp):
 def updateSettings(currentOrder, orderId):
     with open('botMoney.json', 'w') as file: 
         json.dump({"buySide": buySide, "botMoney": botMoney, "currentOrder": currentOrder, "orderId": orderId}, file)
+
+## Check if previous order is still open
+if not orderId == None:
+    
+    response = bitvavo.getOrder("ETH", orderId)
+    
+    if response['status'] == "filled" and buySide:
+        print("Previous buy order is filled")
+        print(response)
+        buySide = False
+        # botMoney = ?
+        
+    elif response['status'] == "filled" and not buySide:
+        print("Previous sell order is filled")
+        buySide = True
+        botMoney = response['filledAmountQuote']
+        
+    else:
+        print("Previous order is still open")
 
 ## Check if the given botMoney is available on the exchange
 if buySide: exchangeMoney = float(bitvavo.getBalance("EUR")['available'])
