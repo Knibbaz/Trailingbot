@@ -52,7 +52,7 @@ def trading(buySide, currentOrder, botMoney, BTSL, STSL, fixedPrice, orderId):
             if currentOrder == None and (low < previousLow and buySide or low > previousLow and not buySide):
                 if buySide: currentOrder = possibleBuyOrder
                 else: currentOrder = possibleSellOrder
-                print("TEST")
+
                 createStopLossOrder(buySide, currentOrder, timestamp, orderId)
                 
             if not currentOrder == None:

@@ -31,8 +31,20 @@ The lower you set the value of STSL, the earlier it will sell.
 
 ## Backtesting
 
-I have tested this bot with different coins, intervals, start/end dates, BTSL, STSL. 
-The best values found for BTSL is **?** and for STSL is **?**.
+I have tested this bot with different coins, intervals, start/end dates, BTSL, STSL.
+
+To execute tests you can run `docker run -d -e MSL=5 -e SSL=0.1 -e PF=False basabbink/trailing-bot:test`
+
+Variables:
+- MSL:
+- SSL:
+- PF:
+- START:
+- END:
+- INT:
+
+The best values found for **variable** BTSL is **4** and for STSL is **2**.
+The best values found for **fixed** BTSL is **100** and for STSL is **100**.
 
 ## Donations
 
