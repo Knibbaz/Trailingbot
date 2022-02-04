@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 import json
-from time import time
 from dotenv import load_dotenv, find_dotenv
 import requests
 from datetime import datetime
