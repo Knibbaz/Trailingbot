@@ -1,0 +1,8 @@
+{
+    "interval": "15m",
+    "market": "ETH",
+    "exchange": "Bitvavo",
+    "BTSL": 10,
+    "STSL": 7.5,
+    "fixedPrice": false
+}

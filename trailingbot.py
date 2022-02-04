@@ -1,21 +1,37 @@
 #!/usr/bin/python3
+import json
+from time import time
+from dotenv import load_dotenv, find_dotenv
 import requests
 from datetime import datetime
 import bitvavo
 
+load_dotenv(find_dotenv())
+
 day = 86400 ## Timestamp for one day
+start = int(datetime.now().timestamp()) - (day * 10) ## First timestamp
+end = int(datetime.now().timestamp()) ## Latest timestamp
 
-interval = '15m' ## Timestamp to trade on
-start = int(datetime.now().timestamp()) - (day * 30) ##
-end = int(datetime.now().timestamp()) ##
-market = "ETH" ## Market to trade on
+## Bot settings
+with open('settings.json', 'r') as file: data = json.load(file)
+interval = data["interval"]
+exchange = data["exchange"]
+market = data['market']
+BTSL = data['BTSL']
+STSL = data['STSL']
+fixedPrice = data['fixedPrice']
 
-tradingExchange = "Bitvavo"
+with open('botMoney.json', 'r') as file: data = json.load(file)
+buySide = data['buySide']
+botMoney = data['botMoney']
+currentOrder = data['currentOrder']
+orderId = data['orderId']
 
 # Get the chartdata
 chart = requests.get("https://api.binance.com/api/v3/klines?symbol=" + market + "EUR&interval=" + interval + "&limit=1000" + "&startTime=" + str(start * 1000) + "&endTime=" + str(end * 1000)).json()
+if len(chart) >= 1000: raise Exception("Not all the data is loaded")
 
-def trading(buySide, currentOrder, botMoney, BTSL, STSL, priceFixed):
+def trading(buySide, currentOrder, botMoney, BTSL, STSL, fixedPrice, orderId):
     previousLow = None
     trades = []
     
@@ -23,7 +39,7 @@ def trading(buySide, currentOrder, botMoney, BTSL, STSL, priceFixed):
         timestamp = float(candle[0] / 1000)
         low = float(candle[3])
         
-        if priceFixed:
+        if fixedPrice:
             possibleBuyOrder = low + BTSL
             possibleSellOrder = low - STSL
         else:
@@ -35,81 +51,63 @@ def trading(buySide, currentOrder, botMoney, BTSL, STSL, priceFixed):
             
             ## For creating the first order or after bought/sold
             if currentOrder == None and (low < previousLow and buySide or low > previousLow and not buySide):
-                currentOrder = possibleBuyOrder
-                createStopLossOrder(buySide, currentOrder, timestamp)
-                    
-            ## Check if there is a buy or sell option
-            if (low < previousLow and buySide and possibleBuyOrder < currentOrder) or (low > previousLow and not buySide and possibleSellOrder > currentOrder): ## BUY
                 if buySide: currentOrder = possibleBuyOrder
                 else: currentOrder = possibleSellOrder
-                createStopLossOrder(buySide, currentOrder, timestamp)
-        
-         ## Check if we can filled an order
-        if not currentOrder == None:
-            if (low > currentOrder and buySide) or (low < currentOrder and not buySide): ##
-                string = ""
-                profit = 0
+                print("TEST")
+                createStopLossOrder(buySide, currentOrder, timestamp, orderId)
                 
-                if buySide: 
-                    string = "BOUGHT"
-                    if len(trades) > 0: profit = trades[-1]['price'] / currentOrder * 100
-                    botMoney = botMoney / currentOrder 
-                    
-                else:
-                    string = "SOLD"
-                    if len(trades) > 0: profit =  currentOrder / trades[-1]['price'] * 100
-                    botMoney = botMoney * currentOrder 
-                
-                trades.append({"side": string, "price": currentOrder, "timestamp": timestamp, "botMoney": botMoney, "profitable": bool(profit > 100)})
-                
-                print(string, round(currentOrder, 2), round(botMoney, 2))
-                
-                currentOrder = None
-                buySide = not buySide
+            if not currentOrder == None:
+                # Check if there is a buy or sell option
+                if (low < previousLow and buySide and possibleBuyOrder < currentOrder) or (low > previousLow and not buySide and possibleSellOrder > currentOrder):
+                    if buySide: currentOrder = possibleBuyOrder
+                    else: currentOrder = possibleSellOrder
+                    createStopLossOrder(buySide, currentOrder, timestamp, orderId)
                 
         previousLow=low
-    print()
+    
     return(trades, botMoney)
 
 ## Create (test) orders
-def createStopLossOrder(buySide, order, timestamp):
-    order = round(order, 2)
-    if buySide: print("BSL at", order)
-    else: print("SSL at", order)
+def createStopLossOrder(buySide, order, timestamp, orderId):    
+    targetPrice = int(round(order, 0))
     
-    exchange = getExchange()
-    
-    ## FIX BASED ON INTERVAL
-    if timestamp >= datetime.now().timestamp() - day:
-        print("Place real order")
-        result = exchange.placeStopLossOrder("ETH", "sell", 0.02, 2700)
-        print(result)
+    if checkLatestTimestamp(timestamp):
         
-def getExchange():
-    if tradingExchange == "Bitvavo": return bitvavo
+        if not orderId == None:
+            print("Cancel previous order")
+            response = bitvavo.cancelOrder("ETH", orderId)
+            print('Deleted', response['orderId'])
+        
+        if buySide: 
+            response = bitvavo.placeStopLossOrder("ETH", "buy", botMoney, targetPrice)
+            orderId = response['orderId']
+            print(response)
+        
+        else:
+            response = bitvavo.placeStopLossOrder("ETH", "sell", botMoney, targetPrice)
+            orderId = response['orderId']
+            print(response)
+            
+        updateSettings(targetPrice, orderId)
 
-def isItBetweenTheInterval(currentTimestamp):
-    if interval == "15m": return currentTimestamp >= datetime.now().timestamp() - (day / 24 / 60 * 15)
-    if interval == "30m": return currentTimestamp >= datetime.now().timestamp() - (day / 24 / 60 * 30)
-    if interval == "1h": return currentTimestamp >= datetime.now().timestamp() - (day / 24)
-    if interval == "4h": return currentTimestamp >= datetime.now().timestamp() - (day / 24 * 4)
-    if interval == "8h": return currentTimestamp >= datetime.now().timestamp() - (day / 24 * 8)
-    if interval == "1d": return currentTimestamp >= datetime.now().timestamp() - day
+def checkLatestTimestamp(currentTimestamp):
+    if interval == "15m": return currentTimestamp >= end - (day / 24 / 60 * 15)
+    if interval == "30m": return currentTimestamp >= end - (day / 24 / 60 * 30)
+    if interval == "1h": return currentTimestamp >= end - (day / 24)
+    if interval == "4h": return currentTimestamp >= end - (day / 24 * 4)
+    if interval == "8h": return currentTimestamp >= end - (day / 24 * 8)
+    if interval == "1d": return currentTimestamp >= end - day
 
-## Bot settings
-BTSL = 10 ## Percentage or fixed price above low to buy.
-STSL = 7.5 ## Percentage or fixed price below low to sell.
-priceFixed = False ## Set if you want to use percentage or fixed price for placing orders.
-buySide = True ## Do you want to start with buying (True) or with selling (False).
-currentOrder = None ## If have running orders, set its price here. Otherwise set it to None.
-botMoney = 1000 ## The amount of money the bot can play with. If you own crypto already, you can put the amount here and must set buySide to False.
+def updateSettings(currentOrder, orderId):
+    with open('botMoney.json', 'w') as file: 
+        json.dump({"buySide": buySide, "botMoney": botMoney, "currentOrder": currentOrder, "orderId": orderId}, file)
+
+## Check if the given botMoney is available on the exchange
+if buySide: exchangeMoney = float(bitvavo.getBalance("EUR")['available'])
+else: exchangeMoney = float(bitvavo.getBalance(market)['available'])
+
+if exchangeMoney <= botMoney: raise Exception("The money is not (yet) available on the account")
 
 ## Run the bot
-# trades, botMoney = trading(buySide, currentOrder, botMoney, BTSL, STSL, priceFixed)
-# print(trades)
-
-# ## If recently bought, multiply the amount bought by the latest closing rate
-# if trades[-1]['side'] == "BOUGHT": botMoney = botMoney * float(chart[-1][4])
-# print("\nResult:", botMoney)
-
-intervalThingy(datetime.now().timestamp() - (day / 5))
+result = trading(buySide, currentOrder, botMoney, BTSL, STSL, fixedPrice, orderId)
+print(result)
