@@ -4,8 +4,11 @@ from python_bitvavo_api.bitvavo import Bitvavo
 
 load_dotenv(find_dotenv())
 
-APISECRET = os.environ.get("APISECRET")
 APIKEY = os.environ.get("APIKEY")
+APISECRET = os.environ.get("APISECRET")
+
+if APIKEY == None or APISECRET == None:
+  raise Exception("API is not set, you need to create a .env file with APIKEY= and APISECRET=")
 
 bitvavo = Bitvavo({
   'APIKEY': APIKEY,
