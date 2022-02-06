@@ -1,38 +1,72 @@
 #!/usr/bin/python3
 import json
-from dotenv import load_dotenv, find_dotenv
 import requests
-from datetime import datetime
 import bitvavo
-
-load_dotenv(find_dotenv())
+from icecream import ic
 
 day = 86400 ## Timestamp for one day
-start = int(datetime.now().timestamp()) - (day * 10) ## First timestamp
-end = int(datetime.now().timestamp() - (day / 24 / 60 * 30)) ## Latest timestamp
-
-## Bot settings
-with open('settings.json', 'r') as file: data = json.load(file)
-interval = data["interval"]
-exchange = data["exchange"]
-market = data['market']
-BTSL = data['BTSL']
-STSL = data['STSL']
-fixedPrice = data['fixedPrice']
-
-with open('botMoney.json', 'r') as file: data = json.load(file)
-buySide = data['buySide']
-botMoney = data['botMoney']
-currentOrder = data['currentOrder']
-orderId = data['orderId']
 
 # Get the chartdata
-chart = requests.get("https://api.binance.com/api/v3/klines?symbol=" + market + "EUR&interval=" + interval + "&limit=1000" + "&startTime=" + str(start * 1000) + "&endTime=" + str(end * 1000)).json()
-if len(chart) >= 1000: raise Exception("Not all the data is loaded")
+def getChartData(market, interval, start, end):
+    chart = requests.get("https://api.binance.com/api/v3/klines?symbol=" + market + "EUR&interval=" + interval + "&limit=1000" + "&startTime=" + str(start * 1000) + "&endTime=" + str(end * 1000)).json()
+    if len(chart) >= 1000: raise Exception("Not all the data is loaded. Bring the start or end date closer or increase the interval")
+    return chart
 
-def trading(buySide, currentOrder, botMoney, BTSL, STSL, fixedPrice, orderId):
+def startTrading(market, interval, start, end, buySide, currentOrder, botMoney, BTSL, STSL, fixedPrice, orderId):
     previousLow = None
     trades = []
+    
+    ## MAKE A FUNCTION FOR THIS
+    ## Check if previous order is still open
+    if not orderId == None:
+        ic("Check order")
+        response = bitvavo.getOrder("ETH", orderId)
+        ic("Order", response['status'])
+        
+        if response['status'] == "filled" or response['status'] == "canceled":
+            currentOrder = None
+            orderId = None
+            
+            if buySide:
+                ic("Previous buy order is filled")
+                buySide = False
+                # botMoney = ?
+            
+            if not buySide:
+                ic("Previous sell order is filled")
+                buySide = True
+                botMoney = float(response['filledAmountQuote'])
+            
+            if response['status'] == "canceled":
+                if response['side'] == "buy": 
+                    buySide = True
+                    botMoney = float(response['amount'] * response['price'])
+                    
+                if response['side'] == "sell": 
+                    buySide = False
+                    botMoney = float(response['amount'])
+            
+            updateSettings(buySide, botMoney, currentOrder, orderId)
+    
+    ic("Get chart data")
+    chart = getChartData(market, interval, start, end)
+    ic("Chart length", len(chart))
+    
+    ## If no order, create order based on the latest candle
+    if currentOrder == None:
+        timestamp = float(chart[-1][0] / 1000)
+        low = float(chart[-1][3])
+        ic("Creating the first order")
+        if fixedPrice:
+            possibleBuyOrder = low + BTSL
+            possibleSellOrder = low - STSL
+        else:
+            possibleBuyOrder = low * (1 + BTSL / 100)
+            possibleSellOrder = low * (1 - STSL / 100)
+            
+        if buySide: currentOrder = possibleBuyOrder
+        else: currentOrder = possibleSellOrder
+        createStopLossOrder(buySide, botMoney, currentOrder, timestamp, orderId, interval, end, True)
     
     for candle in chart:
         timestamp = float(candle[0] / 1000)
@@ -48,84 +82,52 @@ def trading(buySide, currentOrder, botMoney, BTSL, STSL, fixedPrice, orderId):
         ## Skip first run
         if not previousLow == None:
             
-            ## For creating the first order or after bought/sold
-            if currentOrder == None and (low < previousLow and buySide or low > previousLow and not buySide):
-                if buySide: currentOrder = possibleBuyOrder
-                else: currentOrder = possibleSellOrder
-
-                createStopLossOrder(buySide, currentOrder, timestamp, orderId)
-                
+            # Check if there is a buy or sell option
             if not currentOrder == None:
-                # Check if there is a buy or sell option
                 if (low < previousLow and buySide and possibleBuyOrder < currentOrder) or (low > previousLow and not buySide and possibleSellOrder > currentOrder):
-                    if buySide: currentOrder = possibleBuyOrder
-                    else: currentOrder = possibleSellOrder
-                    createStopLossOrder(buySide, currentOrder, timestamp, orderId)
+                    if buySide: targetPrice = possibleBuyOrder
+                    else: targetPrice = possibleSellOrder
+                    createStopLossOrder(buySide, botMoney, targetPrice, timestamp, orderId, interval, end, False)
                 
         previousLow=low
     
     return(trades, botMoney)
 
 ## Create (test) orders
-def createStopLossOrder(buySide, order, timestamp, orderId):    
+def createStopLossOrder(buySide, botMoney, order, timestamp, orderId, interval, end, isNewOrder):    
     targetPrice = int(round(order, 0))
     
-    if checkLatestTimestamp(timestamp):
-        
+    if checkLatestTimestamp(interval, timestamp, end) or isNewOrder:
         if not orderId == None:
-            print("Cancel previous order")
             response = bitvavo.cancelOrder("ETH", orderId)
-            print('Deleted', response['orderId'])
-        
-        if buySide: 
-            response = bitvavo.placeStopLossOrder("ETH", "buy", botMoney, targetPrice)
+            print('Canceled', response['orderId'])
+            
+        if buySide:
+            amount = float(round(botMoney / targetPrice, 5))
+            response = bitvavo.placeStopLossOrder("ETH", "buy", amount, targetPrice)
             orderId = response['orderId']
-            print(response)
-        
+            print("STOPLOSS BUY", response['market'], response['amount'], response['price'])
+            
         else:
             response = bitvavo.placeStopLossOrder("ETH", "sell", botMoney, targetPrice)
             orderId = response['orderId']
-            print(response)
+            print("STOPLOSS SELL", response['market'], response['amount'], response['price'])
             
-        updateSettings(targetPrice, orderId)
+        updateSettings(buySide, botMoney, targetPrice, orderId)
 
-def checkLatestTimestamp(currentTimestamp):
+def checkLatestTimestamp(interval, currentTimestamp, end):
+    if interval == "1m": return currentTimestamp >= end - (day / 24 / 60)
+    if interval == "5m": return currentTimestamp >= end - (day / 24 / 60 * 5)
     if interval == "15m": return currentTimestamp >= end - (day / 24 / 60 * 15)
     if interval == "30m": return currentTimestamp >= end - (day / 24 / 60 * 30)
     if interval == "1h": return currentTimestamp >= end - (day / 24)
+    if interval == "2h": return currentTimestamp >= end - (day / 24 * 2)
     if interval == "4h": return currentTimestamp >= end - (day / 24 * 4)
+    if interval == "6h": return currentTimestamp >= end - (day / 24 * 5)
     if interval == "8h": return currentTimestamp >= end - (day / 24 * 8)
+    if interval == "12h": return currentTimestamp >= end - (day / 24 * 12)
     if interval == "1d": return currentTimestamp >= end - day
 
-def updateSettings(currentOrder, orderId):
+def updateSettings(buySide, botMoney, currentOrder, orderId):
     with open('botMoney.json', 'w') as file: 
         json.dump({"buySide": buySide, "botMoney": botMoney, "currentOrder": currentOrder, "orderId": orderId}, file)
-
-## Check if previous order is still open
-if not orderId == None:
-    
-    response = bitvavo.getOrder("ETH", orderId)
-    
-    if response['status'] == "filled" and buySide:
-        print("Previous buy order is filled")
-        print(response)
-        buySide = False
-        # botMoney = ?
-        
-    elif response['status'] == "filled" and not buySide:
-        print("Previous sell order is filled")
-        buySide = True
-        botMoney = response['filledAmountQuote']
-        
-    else:
-        print("Previous order is still open")
-
-## Check if the given botMoney is available on the exchange
-if buySide: exchangeMoney = float(bitvavo.getBalance("EUR")['available'])
-else: exchangeMoney = float(bitvavo.getBalance(market)['available'])
-
-if exchangeMoney <= botMoney: raise Exception("The money is not (yet) available on the account")
-
-## Run the bot
-result = trading(buySide, currentOrder, botMoney, BTSL, STSL, fixedPrice, orderId)
-print(result)
