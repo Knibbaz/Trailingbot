@@ -33,7 +33,7 @@ The lower you set the value of STSL, the earlier it will sell.
 
 I have tested this bot with different coins, intervals, start/end dates, BTSL, STSL.
 
-To execute tests you can run `docker run -d -e MSL=5 -e SSL=0.1 -e PF=False basabbink/trailing-bot:test`
+To execute tests you can run `docker run -d -e EXCHANGE= -e APIKEY= -e APISECRET= basabbink/trailing-bot:test`
 
 Variables:
 - MSL:
