@@ -1,8 +1,8 @@
 {
-    "interval": "15m",
+    "interval": "5m",
     "market": "ETH",
-    "exchange": "Bitvavo",
-    "BTSL": 10,
-    "STSL": 7.5,
-    "fixedPrice": false
+    "BTSL": 20,
+    "STSL": 20,
+    "fixedPrice": true,
+    "testRun": false
 }
