@@ -26,7 +26,6 @@ def getOrder(coin, orderId): return bitvavo.getOrder(coin + '-EUR', orderId)
 def getOpenOrders(): return bitvavo.ordersOpen({})
 
 def placeStopLossOrder(coin, side, amount, targetPrice):
-  print(amount)
   amount = float(getRightDecimals(amount))
   targetPrice = int(getRightDecimals(targetPrice))
   

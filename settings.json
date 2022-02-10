@@ -3,6 +3,5 @@
     "market": "ETH",
     "BTSL": 20,
     "STSL": 20,
-    "fixedPrice": true,
-    "testRun": false
+    "fixedPrice": true
 }
