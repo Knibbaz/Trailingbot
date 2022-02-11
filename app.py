@@ -39,19 +39,9 @@ def runBot():
 
     trailingbot.startTrading(chart, currentState, botSettings)
 
-    if interval == "1m": schedule.every(1).minute.do(runBot)
-    if interval == "5m": schedule.every(5).minutes.do(runBot)
-    if interval == "15m": schedule.every(15).minutes.do(runBot)
-    if interval == "30m": schedule.every(30).minutes.do(runBot)
-    if interval == "1h": schedule.every(1).hour.do(runBot)
-    if interval == "2h": schedule.every(2).hours.do(runBot)
-    if interval == "4h": schedule.every(4).hours.do(runBot)
-    if interval == "6h": schedule.every(6).hours.do(runBot)
-    if interval == "8h": schedule.every(8).hours.do(runBot)
-    if interval == "12h": schedule.every(12).hours.do(runBot)
-    if interval == "1d": schedule.every(1).day.do(runBot)
-
 runBot()
+ 
+schedule.every(1).minute.do(runBot)
 
 while True:
     schedule.run_pending()
