@@ -1,5 +1,3 @@
-import schedule
-import time
 import json
 from datetime import datetime
 from dotenv import load_dotenv, find_dotenv
@@ -10,6 +8,7 @@ load_dotenv(find_dotenv())
 day = 86400  # Timestamp for one day
 
 def runBot():
+    print(datetime.now())
     start = int(datetime.now().timestamp() - (day / 24))  # First timestamp
     end = int(datetime.now().timestamp())  # Latest timestamp
 
@@ -21,6 +20,7 @@ def runBot():
         BTSL = data['BTSL']
         STSL = data['STSL']
         fixedPrice = data['fixedPrice']
+        testRun = data['testRun']
 
     with open('currentState.json', 'r') as file:
         data = json.load(file)
@@ -31,17 +31,10 @@ def runBot():
         targetPrice = data['targetPrice']
 
     # Run the bot
-    print(datetime.now())
-    
     chart = {"market": market, "interval": interval, "start": start, "end": end}
-    botSettings = {"BTSL": BTSL, "STSL": STSL, "fixedPrice": fixedPrice}
+    botSettings = {"BTSL": BTSL, "STSL": STSL, "fixedPrice": fixedPrice, "testRun": testRun}
     currentState = {"buySide": buySide, "botMoney": botMoney, "orderId": orderId, "amount": amount, "targetPrice": targetPrice}
 
     trailingbot.startTrading(chart, currentState, botSettings)
 
 runBot()
- 
-schedule.every(1).minute.do(runBot)
-
-while True:
-    schedule.run_pending()
